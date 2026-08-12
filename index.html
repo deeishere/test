@@ -154,7 +154,7 @@
     <p class="status" id="status"></p>
   </div>
 
-  <video id="webcam" playsinline></video>
+  <video id="webcam" autoplay muted playsinline></video>
   <video id="innerVideo" playsinline loop muted></video>
   <img id="innerImage" src="spider.jpg" alt="" hidden />
 
@@ -183,6 +183,8 @@
     let trackMode = 'face'; // 'face' | 'hands'
     let userBlobUrl = null;
     let smoothed = null;
+    let currentFaceTransform = null;
+    let lastFaceTransform = null;
     let lastSilhouette = null;
     let faceLostTime = 0;
     const RECOVERY_TIMEOUT = 1000; // ms
@@ -204,7 +206,7 @@
     function getFaceFrameCorners(landmarks, w, h, margin = 1.45) {
       function pt(idx) {
         const lm = landmarks[idx];
-        return [lm.x * w, lm.y * h];
+        return [(1 - lm.x) * w, lm.y * h];
       }
 
       const leftCheek = pt(LM_LEFT_CHEEK);
@@ -392,13 +394,26 @@
     hands.onResults(onResults);
     faceMesh.onResults(onResults);
 
-    const camera = new Camera(webcam, {
-      onFrame: async () => {
-        await (trackMode === 'hands' ? hands : faceMesh).send({ image: webcam });
-      },
-      width: W,
-      height: H,
-    });
+    let trackingActive = false;
+    let processingFrame = false;
+
+    async function processCameraFrame() {
+      if (!trackingActive) return;
+
+      if (!processingFrame && webcam.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        processingFrame = true;
+        try {
+          await (trackMode === 'hands' ? hands : faceMesh).send({ image: webcam });
+        } catch (error) {
+          console.error('MediaPipe frame error:', error);
+          setStatus(`Tracking error: ${error.message || error}`);
+        } finally {
+          processingFrame = false;
+        }
+      }
+
+      requestAnimationFrame(processCameraFrame);
+    }
 
     // --- event listeners ---
 
@@ -408,9 +423,24 @@
     btnStart.addEventListener('click', async () => {
       try {
         setStatus('Initializing camera...');
-        await camera.start();
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+
+        webcam.srcObject = stream;
+        await webcam.play();
+
+        console.log("Camera stream:", webcam.srcObject);
+        console.log("Video:", webcam.videoWidth, webcam.videoHeight);
+
         btnStart.style.display = 'none';
         setStatus('Camera active');
+
+        trackingActive = true;
+        requestAnimationFrame(processCameraFrame);
+
       } catch (err) {
         console.error("Camera start failed:", err);
         setStatus('Error: ' + err.message);
@@ -421,6 +451,10 @@
       trackMode = trackMode === 'face' ? 'hands' : 'face';
       btnMode.textContent = trackMode === 'face' ? 'Switch to Hands' : 'Switch to Face';
       smoothed = null;
+      currentFaceTransform = null;
+      lastFaceTransform = null;
+      lastSilhouette = null;
+      faceLostTime = 0;
     });
 
     document.getElementById('btnUpload').addEventListener('click', () => fileInput.click());
@@ -511,6 +545,7 @@
 
       let targetPoints = null;
       let currentSilhouette = null;
+      currentFaceTransform = null;
 
       if (trackMode === 'hands') {
         const handPts = {};
@@ -535,13 +570,15 @@
       } else if (trackMode === 'face') {
         if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
           const lms = results.multiFaceLandmarks[0];
-          targetPoints = getFaceFrameCorners(lms, W, H);
+          currentFaceTransform = getFaceFrameCorners(lms, W, H);
+          targetPoints = currentFaceTransform.corners;
           currentSilhouette = FACE_OUTLINE.map(idx => [(1 - lms[idx].x) * W, lms[idx].y * H]);
           faceLostTime = 0;
         } else {
           if (faceLostTime === 0) faceLostTime = performance.now();
           if (performance.now() - faceLostTime < RECOVERY_TIMEOUT) {
             targetPoints = smoothed;
+            currentFaceTransform = lastFaceTransform;
             currentSilhouette = lastSilhouette;
           }
         }
@@ -551,12 +588,17 @@
         if (!smoothed) smoothed = targetPoints;
         else smoothed = lerpPolygon(smoothed, targetPoints, 0.35);
         
+        if (currentFaceTransform) lastFaceTransform = currentFaceTransform;
         if (currentSilhouette) lastSilhouette = currentSilhouette;
-        
-        compositeFrame(smoothed, currentSilhouette || lastSilhouette, t);
+
+        const polyData = currentFaceTransform || lastFaceTransform || smoothed;
+        if (polyData.corners) polyData.corners = smoothed;
+        compositeFrame(polyData, currentSilhouette || lastSilhouette, t);
         setStatus(faceLostTime > 0 ? 'Recovering...' : '');
       } else {
         smoothed = null;
+        currentFaceTransform = null;
+        lastFaceTransform = null;
         lastSilhouette = null;
       }
     }
