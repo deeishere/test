@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frame in Frame</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #D1FFBD;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.45) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(90,158,58,0.12) 0%, transparent 45%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1.25rem 2.5rem;
+      color: #142410;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: #0f1a0c;
+    }
+
+    h1 span {
+      display: block;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.42em;
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #3d6b2e;
+      margin-bottom: 0.35rem;
+    }
+
+    .stage {
+      width: 100%;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #0a0a0a;
+      box-shadow:
+        0 2px 4px rgba(15, 26, 12, 0.06),
+        0 24px 48px rgba(15, 26, 12, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+
+    #output {
+      display: block;
+      width: 100%;
+      height: auto;
+      vertical-align: middle;
+    }
+
+    video, #innerVideo { display: none; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      font-family: 'Outfit', sans-serif;
+      padding: 0.7rem 1.5rem;
+      border: none;
+      border-radius: 999px;
+      background: #0f1a0c;
+      color: #D1FFBD;
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+      box-shadow: 0 4px 14px rgba(15, 26, 12, 0.2);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(15, 26, 12, 0.28);
+      background: #1a2e14;
+    }
+
+    button:active { transform: translateY(0); }
+
+    button.delete {
+      background: transparent;
+      color: #5a3030;
+      border: 1.5px solid rgba(90, 48, 48, 0.35);
+      box-shadow: none;
+    }
+
+    button.delete:hover {
+      background: rgba(255, 255, 255, 0.5);
+      box-shadow: none;
+    }
+
+    .status {
+      font-size: 0.78rem;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      color: #3d6b2e;
+      min-height: 1.2em;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .status.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1><span>Welcome to</span>Frame in Frame!</h1>
+    </header>
+
+    <div class="stage">
+      <canvas id="output" width="1280" height="720"></canvas>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="btnStart" style="background: #3d6b2e; color: white;">Start Camera</button>
+      <button type="button" id="btnMode">Switch to Hands</button>
+      <button type="button" id="btnUpload">Upload</button>
+      <button type="button" id="btnDelete" class="delete">Delete</button>
+      <input type="file" id="fileInput" accept="image/*,video/*" hidden />
+    </div>
+
+    <p class="status" id="status"></p>
+  </div>
+
+  <video id="webcam" playsinline></video>
+  <video id="innerVideo" playsinline loop muted></video>
+  <img id="innerImage" src="spider.jpg" alt="" hidden />
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559531/face_mesh.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.min.js"></script>
+
+  <script>
+    // Console logging to help debug
+    console.log("Script starting...");
+
+    const canvas = document.getElementById('output');
+    const ctx = canvas.getContext('2d');
+    const webcam = document.getElementById('webcam');
+    const innerVideo = document.getElementById('innerVideo');
+    const innerImage = document.getElementById('innerImage');
+    const fileInput = document.getElementById('fileInput');
+    const statusEl = document.getElementById('status');
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const DEFAULT_INNER = 'spider.jpg';
+
+    let innerKind = 'image'; // image | video
+    let trackMode = 'face'; // 'face' | 'hands'
+    let userBlobUrl = null;
+    let smoothed = null;
+    let lastSilhouette = null;
+    let faceLostTime = 0;
+    const RECOVERY_TIMEOUT = 1000; // ms
+    let t0 = performance.now();
+
+    const FACE_OUTLINE = [
+      10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
+      400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
+      54, 103, 67, 109
+    ];
+
+    const LM_LEFT_CHEEK = 234;
+    const LM_RIGHT_CHEEK = 454;
+    const LM_FOREHEAD = 10;
+    const LM_CHIN = 152;
+    const LM_LEFT_EYE_OUTER = 33;
+    const LM_RIGHT_EYE_OUTER = 263;
+
+    function getFaceFrameCorners(landmarks, w, h, margin = 1.45) {
+      function pt(idx) {
+        const lm = landmarks[idx];
+        return [lm.x * w, lm.y * h];
+      }
+
+      const leftCheek = pt(LM_LEFT_CHEEK);
+      const rightCheek = pt(LM_RIGHT_CHEEK);
+      const forehead = pt(LM_FOREHEAD);
+      const chin = pt(LM_CHIN);
+      const leftEye = pt(LM_LEFT_EYE_OUTER);
+      const rightEye = pt(LM_RIGHT_EYE_OUTER);
+
+      const center = [
+        (leftCheek[0] + rightCheek[0] + forehead[0] + chin[0]) / 4,
+        (leftCheek[1] + rightCheek[1] + forehead[1] + chin[1]) / 4,
+      ];
+
+      const faceWidth = Math.sqrt(Math.pow(rightCheek[0] - leftCheek[0], 2) + Math.pow(rightCheek[1] - leftCheek[1], 2)) * margin;
+      const faceHeight = Math.sqrt(Math.pow(chin[0] - forehead[0], 2) + Math.pow(chin[1] - forehead[1], 2)) * margin;
+
+      const dx = rightEye[0] - leftEye[0];
+      const dy = rightEye[1] - leftEye[1];
+      const angle = Math.atan2(dy, dx);
+
+      const hw = faceWidth / 2;
+      const hh = faceHeight / 2;
+
+      const local = [
+        [-hw, -hh], // TL
+        [hw, -hh],  // TR
+        [hw, hh],   // BR
+        [-hw, hh],  // BL
+      ];
+
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      const corners = local.map(p => [
+        p[0] * cos - p[1] * sin + center[0],
+        p[0] * sin + p[1] * cos + center[1],
+      ]);
+
+      return { corners, center, angle, faceWidth, faceHeight };
+    }
+
+    function lerpPolygon(prev, target, t) {
+      return prev.map((p, i) => [
+        p[0] + (target[i][0] - p[0]) * t,
+        p[1] + (target[i][1] - p[1]) * t,
+      ]);
+    }
+
+    function polygonArea(pts) {
+      let area = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const j = (i + 1) % pts.length;
+        area += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
+      }
+      return Math.abs(area) / 2;
+    }
+
+    function coverCrop(source, tw, th) {
+      const off = document.createElement('canvas');
+      off.width = tw;
+      off.height = th;
+      const octx = off.getContext('2d');
+      const sw = source.videoWidth || source.naturalWidth || source.width;
+      const sh = source.videoHeight || source.naturalHeight || source.height;
+      if (!sw || !sh) return off;
+      const scale = Math.max(tw / sw, th / sh);
+      const nw = Math.ceil(sw * scale);
+      const nh = Math.ceil(sh * scale);
+      const x0 = (nw - tw) / 2;
+      const y0 = (nh - th) / 2;
+      octx.drawImage(source, -x0, -y0, nw, nh);
+      return off;
+    }
+
+    function placeholderTile(w, h, t) {
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d');
+      octx.fillStyle = '#101010';
+      octx.fillRect(0, 0, w, h);
+      const stripeW = 18;
+      const shift = (Math.floor(t * 40) % (stripeW * 2));
+      octx.fillStyle = '#52e0c4';
+      for (let x = -h - shift; x < w; x += stripeW * 2) {
+        octx.beginPath();
+        octx.moveTo(x, h);
+        octx.lineTo(x + h, 0);
+        octx.lineTo(x + h + stripeW, 0);
+        octx.lineTo(x + stripeW, h);
+        octx.closePath();
+        octx.fill();
+      }
+      octx.globalAlpha = 0.18;
+      octx.fillStyle = '#52e0c4';
+      octx.fillRect(0, 0, w, h);
+      return off;
+    }
+
+    function getInnerFrame(w, h, t) {
+      if (innerKind === 'video' && innerVideo.readyState >= 2) {
+        return coverCrop(innerVideo, w, h);
+      }
+      if (innerImage.complete && innerImage.naturalWidth) {
+        return coverCrop(innerImage, w, h);
+      }
+      return placeholderTile(w, h, t);
+    }
+
+    // --- inner content upload / delete ---
+
+    function revokeUserBlob() {
+      if (userBlobUrl) {
+        URL.revokeObjectURL(userBlobUrl);
+        userBlobUrl = null;
+      }
+    }
+
+    function loadDefaultInner() {
+      revokeUserBlob();
+      innerKind = 'image';
+      innerVideo.pause();
+      innerVideo.removeAttribute('src');
+      innerImage.src = DEFAULT_INNER;
+      fileInput.value = '';
+      setStatus('');
+    }
+
+    function uploadInnerFile(file) {
+      if (!file) return;
+      revokeUserBlob();
+      const url = URL.createObjectURL(file);
+      userBlobUrl = url;
+      if (file.type.startsWith('video/')) {
+        innerKind = 'video';
+        innerVideo.src = url;
+        innerVideo.play().catch(() => {});
+        setStatus(file.name);
+      } else if (file.type.startsWith('image/')) {
+        innerKind = 'image';
+        innerImage.onload = () => setStatus(file.name);
+        innerImage.src = url;
+      } else {
+        revokeUserBlob();
+        setStatus('Unsupported file');
+      }
+    }
+
+    function deleteInnerContent() {
+      loadDefaultInner();
+    }
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+      statusEl.classList.toggle('visible', !!msg);
+    }
+
+    // --- MediaPipe setup ---
+
+    const hands = new Hands({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.5,
+    });
+
+    const faceMesh = new FaceMesh({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559531/${file}`,
+    });
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: false,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.5,
+    });
+
+    hands.onResults(onResults);
+    faceMesh.onResults(onResults);
+
+    const camera = new Camera(webcam, {
+      onFrame: async () => {
+        await (trackMode === 'hands' ? hands : faceMesh).send({ image: webcam });
+      },
+      width: W,
+      height: H,
+    });
+
+    // --- event listeners ---
+
+    const btnMode = document.getElementById('btnMode');
+    const btnStart = document.getElementById('btnStart');
+    
+    btnStart.addEventListener('click', async () => {
+      try {
+        setStatus('Initializing camera...');
+        await camera.start();
+        btnStart.style.display = 'none';
+        setStatus('Camera active');
+      } catch (err) {
+        console.error("Camera start failed:", err);
+        setStatus('Error: ' + err.message);
+      }
+    });
+
+    btnMode.addEventListener('click', () => {
+      trackMode = trackMode === 'face' ? 'hands' : 'face';
+      btnMode.textContent = trackMode === 'face' ? 'Switch to Hands' : 'Switch to Face';
+      smoothed = null;
+    });
+
+    document.getElementById('btnUpload').addEventListener('click', () => fileInput.click());
+    document.getElementById('btnDelete').addEventListener('click', deleteInnerContent);
+    fileInput.addEventListener('change', (e) => uploadInnerFile(e.target.files[0]));
+
+    // --- compositing ---
+
+    function drawPolygonMask(points) {
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+      ctx.closePath();
+    }
+
+    function drawSilhouetteMask(points) {
+      if (!points || points.length === 0) return;
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+      ctx.closePath();
+    }
+
+    function compositeFrame(polyData, silhouette, t) {
+      const poly = polyData.corners || polyData;
+      const { center, angle, faceWidth, faceHeight } = polyData;
+
+      ctx.save();
+      // Apply silhouette mask
+      if (silhouette) {
+        drawSilhouetteMask(silhouette);
+      } else {
+        drawPolygonMask(poly);
+      }
+      ctx.clip();
+
+      // Perspective-like transform for the inner image
+      if (center && faceWidth) {
+        ctx.translate(center[0], center[1]);
+        ctx.rotate(angle);
+        const innerFrame = getInnerFrame(Math.ceil(faceWidth), Math.ceil(faceHeight), t);
+        ctx.drawImage(innerFrame, -faceWidth / 2, -faceHeight / 2, faceWidth, faceHeight);
+      } else {
+        // Fallback for manual/hand mode
+        const xs = poly.map(p => p[0]);
+        const ys = poly.map(p => p[1]);
+        const x0 = Math.max(0, Math.floor(Math.min(...xs)));
+        const y0 = Math.max(0, Math.floor(Math.min(...ys)));
+        const x1 = Math.min(W, Math.ceil(Math.max(...xs)));
+        const y1 = Math.min(H, Math.ceil(Math.max(...ys)));
+        const rw = Math.max(1, x1 - x0);
+        const rh = Math.max(1, y1 - y0);
+        const innerPatch = getInnerFrame(rw, rh, t);
+        ctx.drawImage(innerPatch, x0, y0, rw, rh);
+      }
+      ctx.restore();
+
+      ctx.strokeStyle = '#52e0c4';
+      ctx.lineWidth = 2;
+      if (silhouette) {
+        drawSilhouetteMask(silhouette);
+        ctx.stroke();
+      }
+      
+      drawPolygonMask(poly);
+      ctx.setLineDash([5, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      poly.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#52e0c4';
+        ctx.fill();
+      });
+
+      const ratio = polygonArea(poly) / (W * H);
+      return ratio;
+    }
+
+    function onResults(results) {
+      const t = (performance.now() - t0) / 1000;
+
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(results.image, -W, 0, W, H);
+      ctx.restore();
+
+      let targetPoints = null;
+      let currentSilhouette = null;
+
+      if (trackMode === 'hands') {
+        const handPts = {};
+        if (results.multiHandLandmarks && results.multiHandedness) {
+          for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+            const lm = results.multiHandLandmarks[i];
+            const label = results.multiHandedness[i].label;
+            handPts[label] = {
+              thumb: [(1 - lm[4].x) * W, lm[4].y * H],
+              index: [(1 - lm[8].x) * W, lm[8].y * H],
+            };
+          }
+        }
+        if (handPts.Left && handPts.Right) {
+          targetPoints = [
+            handPts.Left.index,
+            handPts.Right.index,
+            handPts.Right.thumb,
+            handPts.Left.thumb,
+          ];
+        }
+      } else if (trackMode === 'face') {
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+          const lms = results.multiFaceLandmarks[0];
+          targetPoints = getFaceFrameCorners(lms, W, H);
+          currentSilhouette = FACE_OUTLINE.map(idx => [(1 - lms[idx].x) * W, lms[idx].y * H]);
+          faceLostTime = 0;
+        } else {
+          if (faceLostTime === 0) faceLostTime = performance.now();
+          if (performance.now() - faceLostTime < RECOVERY_TIMEOUT) {
+            targetPoints = smoothed;
+            currentSilhouette = lastSilhouette;
+          }
+        }
+      }
+
+      if (targetPoints) {
+        if (!smoothed) smoothed = targetPoints;
+        else smoothed = lerpPolygon(smoothed, targetPoints, 0.35);
+        
+        if (currentSilhouette) lastSilhouette = currentSilhouette;
+        
+        compositeFrame(smoothed, currentSilhouette || lastSilhouette, t);
+        setStatus(faceLostTime > 0 ? 'Recovering...' : '');
+      } else {
+        smoothed = null;
+        lastSilhouette = null;
+      }
+    }
+
+    // --- MediaPipe setup was moved above ---
+  </script>
+</body>
+</html>
