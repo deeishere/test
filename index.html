@@ -121,16 +121,16 @@
     }
 
     .status {
-      font-size: 0.78rem;
-      font-weight: 300;
-      letter-spacing: 0.04em;
-      color: #3d6b2e;
-      min-height: 1.2em;
-      opacity: 0;
-      transition: opacity 0.3s;
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: #0f1a0c;
+      min-height: 1.4em;
+      text-align: center;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.55);
     }
-
-    .status.visible { opacity: 1; }
   </style>
 </head>
 <body>
@@ -145,22 +145,19 @@
 
     <div class="controls">
       <button type="button" id="btnStart" style="background: #3d6b2e; color: white;">Start Camera</button>
-      <button type="button" id="btnMode">Switch to Hands</button>
       <button type="button" id="btnUpload">Upload</button>
       <button type="button" id="btnDelete" class="delete">Delete</button>
       <input type="file" id="fileInput" accept="image/*,video/*" hidden />
     </div>
 
-    <p class="status" id="status"></p>
+    <p class="status" id="status">Loading…</p>
   </div>
 
   <video id="webcam" autoplay muted playsinline></video>
   <video id="innerVideo" playsinline loop muted></video>
   <img id="innerImage" src="spider.jpg" alt="" hidden />
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559531/face_mesh.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
 
   <script>
     // Console logging to help debug
@@ -180,7 +177,6 @@
     const DEFAULT_INNER = 'spider.jpg';
 
     let innerKind = 'image'; // image | video
-    let trackMode = 'face'; // 'face' | 'hands'
     let userBlobUrl = null;
     let smoothed = null;
     let currentFaceTransform = null;
@@ -206,7 +202,7 @@
     function getFaceFrameCorners(landmarks, w, h, margin = 1.45) {
       function pt(idx) {
         const lm = landmarks[idx];
-        return [(1 - lm.x) * w, lm.y * h];
+        return [lm.x * w, lm.y * h];
       }
 
       const leftCheek = pt(LM_LEFT_CHEEK);
@@ -361,55 +357,141 @@
     }
 
     function setStatus(msg) {
-      statusEl.textContent = msg;
-      statusEl.classList.toggle('visible', !!msg);
+      statusEl.textContent = msg || ' ';
     }
 
-    // --- MediaPipe setup ---
+    function drawCanvasHint(text) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, H - 52, W, 52);
+      ctx.fillStyle = '#D1FFBD';
+      ctx.font = '500 20px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, W / 2, H - 20);
+      ctx.textAlign = 'left';
+    }
 
-    const hands = new Hands({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
-    });
+    let faceMesh = null;
 
-    hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.5,
-    });
+    try {
+      if (typeof FaceMesh === 'undefined') {
+        throw new Error('MediaPipe FaceMesh script did not load');
+      }
 
-    const faceMesh = new FaceMesh({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559531/${file}`,
-    });
+      faceMesh = new FaceMesh({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`,
+      });
 
-    faceMesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: false,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.5,
-    });
-
-    hands.onResults(onResults);
-    faceMesh.onResults(onResults);
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: false,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.5,
+      });
+    } catch (error) {
+      console.error('MediaPipe init failed:', error);
+      setStatus(`Tracking unavailable: ${error.message}`);
+    }
 
     let trackingActive = false;
     let processingFrame = false;
+    let cameraStream = null;
+
+    // Mirrored offscreen buffer: we flip the webcam once into this canvas and
+    // use it both for display AND as the image MediaPipe tracks, so landmark
+    // coordinates already match the mirrored (selfie-view) picture — the same
+    // approach testracker.py uses (cv2.flip before face_mesh.process). This
+    // avoids mismatched/inconsistent flips between the video and the frame.
+    const mirrorCanvas = document.createElement('canvas');
+    mirrorCanvas.width = W;
+    mirrorCanvas.height = H;
+    const mirrorCtx = mirrorCanvas.getContext('2d');
+
+    function isSecureContext() {
+      return window.isSecureContext;
+    }
+
+    function updateMirrorCanvas() {
+      if (webcam.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
+      mirrorCtx.save();
+      mirrorCtx.scale(-1, 1);
+      mirrorCtx.drawImage(webcam, -W, 0, W, H);
+      mirrorCtx.restore();
+      return true;
+    }
+
+    function drawWebcamFrame() {
+      ctx.drawImage(mirrorCanvas, 0, 0, W, H);
+    }
+
+    async function startCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setStatus('Camera API unavailable — open via http://localhost, not file://');
+        return;
+      }
+
+      if (!isSecureContext()) {
+        setStatus('Camera needs HTTPS or localhost — run: python3 -m http.server');
+        return;
+      }
+
+      try {
+        setStatus('Starting camera…');
+        btnStart.disabled = true;
+
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(track => track.stop());
+        }
+
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: W },
+            height: { ideal: H },
+          },
+          audio: false,
+        });
+
+        webcam.srcObject = cameraStream;
+        await webcam.play();
+
+        btnStart.style.display = 'none';
+        trackingActive = true;
+        setStatus('Camera on — show your face');
+        requestAnimationFrame(processCameraFrame);
+      } catch (err) {
+        console.error('Camera start failed:', err);
+        btnStart.disabled = false;
+        if (err.name === 'NotAllowedError') {
+          setStatus('Camera blocked — allow access in browser settings');
+        } else if (err.name === 'NotFoundError') {
+          setStatus('No camera found on this device');
+        } else {
+          setStatus(`Camera error: ${err.message || err.name}`);
+        }
+      }
+    }
 
     async function processCameraFrame() {
       if (!trackingActive) return;
 
-      if (!processingFrame && webcam.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      const hasFrame = updateMirrorCanvas();
+      drawWebcamFrame();
+
+      if (faceMesh && hasFrame && !processingFrame) {
         processingFrame = true;
         try {
-          await (trackMode === 'hands' ? hands : faceMesh).send({ image: webcam });
+          // Send the already-mirrored canvas, not the raw webcam element, so
+          // landmark x/y line up directly with what's drawn on screen.
+          await faceMesh.send({ image: mirrorCanvas });
         } catch (error) {
           console.error('MediaPipe frame error:', error);
           setStatus(`Tracking error: ${error.message || error}`);
         } finally {
           processingFrame = false;
         }
+      } else if (!faceMesh) {
+        drawCanvasHint('Camera on — tracking model not loaded');
       }
 
       requestAnimationFrame(processCameraFrame);
@@ -417,45 +499,9 @@
 
     // --- event listeners ---
 
-    const btnMode = document.getElementById('btnMode');
     const btnStart = document.getElementById('btnStart');
-    
-    btnStart.addEventListener('click', async () => {
-      try {
-        setStatus('Initializing camera...');
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false
-        });
-
-        webcam.srcObject = stream;
-        await webcam.play();
-
-        console.log("Camera stream:", webcam.srcObject);
-        console.log("Video:", webcam.videoWidth, webcam.videoHeight);
-
-        btnStart.style.display = 'none';
-        setStatus('Camera active');
-
-        trackingActive = true;
-        requestAnimationFrame(processCameraFrame);
-
-      } catch (err) {
-        console.error("Camera start failed:", err);
-        setStatus('Error: ' + err.message);
-      }
-    });
-
-    btnMode.addEventListener('click', () => {
-      trackMode = trackMode === 'face' ? 'hands' : 'face';
-      btnMode.textContent = trackMode === 'face' ? 'Switch to Hands' : 'Switch to Face';
-      smoothed = null;
-      currentFaceTransform = null;
-      lastFaceTransform = null;
-      lastSilhouette = null;
-      faceLostTime = 0;
-    });
+    btnStart.addEventListener('click', startCamera);
 
     document.getElementById('btnUpload').addEventListener('click', () => fileInput.click());
     document.getElementById('btnDelete').addEventListener('click', deleteInnerContent);
@@ -479,7 +525,7 @@
     }
 
     function compositeFrame(polyData, silhouette, t) {
-      const poly = polyData.corners || polyData;
+      const poly = polyData.corners;
       const { center, angle, faceWidth, faceHeight } = polyData;
 
       ctx.save();
@@ -491,45 +537,20 @@
       }
       ctx.clip();
 
-      // Perspective-like transform for the inner image
-      if (center && faceWidth) {
-        ctx.translate(center[0], center[1]);
-        ctx.rotate(angle);
-        const innerFrame = getInnerFrame(Math.ceil(faceWidth), Math.ceil(faceHeight), t);
-        ctx.drawImage(innerFrame, -faceWidth / 2, -faceHeight / 2, faceWidth, faceHeight);
-      } else {
-        // Fallback for manual/hand mode
-        const xs = poly.map(p => p[0]);
-        const ys = poly.map(p => p[1]);
-        const x0 = Math.max(0, Math.floor(Math.min(...xs)));
-        const y0 = Math.max(0, Math.floor(Math.min(...ys)));
-        const x1 = Math.min(W, Math.ceil(Math.max(...xs)));
-        const y1 = Math.min(H, Math.ceil(Math.max(...ys)));
-        const rw = Math.max(1, x1 - x0);
-        const rh = Math.max(1, y1 - y0);
-        const innerPatch = getInnerFrame(rw, rh, t);
-        ctx.drawImage(innerPatch, x0, y0, rw, rh);
-      }
+      // Rotate/scale the inner content to match the face's tilt and size
+      ctx.translate(center[0], center[1]);
+      ctx.rotate(angle);
+      const innerFrame = getInnerFrame(Math.ceil(faceWidth), Math.ceil(faceHeight), t);
+      ctx.drawImage(innerFrame, -faceWidth / 2, -faceHeight / 2, faceWidth, faceHeight);
       ctx.restore();
 
-      ctx.strokeStyle = '#52e0c4';
-      ctx.lineWidth = 2;
+      // Viewfinder overlay: outline the face silhouette only
       if (silhouette) {
+        ctx.strokeStyle = '#52e0c4';
+        ctx.lineWidth = 2;
         drawSilhouetteMask(silhouette);
         ctx.stroke();
       }
-      
-      drawPolygonMask(poly);
-      ctx.setLineDash([5, 5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      
-      poly.forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p[0], p[1], 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#52e0c4';
-        ctx.fill();
-      });
 
       const ratio = polygonArea(poly) / (W * H);
       return ratio;
@@ -538,72 +559,65 @@
     function onResults(results) {
       const t = (performance.now() - t0) / 1000;
 
-      ctx.save();
-      ctx.scale(-1, 1);
-      ctx.drawImage(results.image, -W, 0, W, H);
-      ctx.restore();
+      // Feed is drawn every frame in processCameraFrame; only composite overlay here.
+      if (!trackingActive) return;
+
+      drawWebcamFrame();
 
       let targetPoints = null;
       let currentSilhouette = null;
       currentFaceTransform = null;
 
-      if (trackMode === 'hands') {
-        const handPts = {};
-        if (results.multiHandLandmarks && results.multiHandedness) {
-          for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-            const lm = results.multiHandLandmarks[i];
-            const label = results.multiHandedness[i].label;
-            handPts[label] = {
-              thumb: [(1 - lm[4].x) * W, lm[4].y * H],
-              index: [(1 - lm[8].x) * W, lm[8].y * H],
-            };
-          }
-        }
-        if (handPts.Left && handPts.Right) {
-          targetPoints = [
-            handPts.Left.index,
-            handPts.Right.index,
-            handPts.Right.thumb,
-            handPts.Left.thumb,
-          ];
-        }
-      } else if (trackMode === 'face') {
-        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-          const lms = results.multiFaceLandmarks[0];
-          currentFaceTransform = getFaceFrameCorners(lms, W, H);
-          targetPoints = currentFaceTransform.corners;
-          currentSilhouette = FACE_OUTLINE.map(idx => [(1 - lms[idx].x) * W, lms[idx].y * H]);
-          faceLostTime = 0;
-        } else {
-          if (faceLostTime === 0) faceLostTime = performance.now();
-          if (performance.now() - faceLostTime < RECOVERY_TIMEOUT) {
-            targetPoints = smoothed;
-            currentFaceTransform = lastFaceTransform;
-            currentSilhouette = lastSilhouette;
-          }
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        // mirrorCanvas was already flipped before being sent to MediaPipe, so
+        // these landmark x/y map directly onto the canvas — no extra mirroring.
+        const lms = results.multiFaceLandmarks[0];
+        currentFaceTransform = getFaceFrameCorners(lms, W, H);
+        targetPoints = currentFaceTransform.corners;
+        currentSilhouette = FACE_OUTLINE.map(idx => [lms[idx].x * W, lms[idx].y * H]);
+        faceLostTime = 0;
+      } else {
+        if (faceLostTime === 0) faceLostTime = performance.now();
+        if (performance.now() - faceLostTime < RECOVERY_TIMEOUT) {
+          targetPoints = smoothed;
+          currentFaceTransform = lastFaceTransform;
+          currentSilhouette = lastSilhouette;
         }
       }
 
       if (targetPoints) {
         if (!smoothed) smoothed = targetPoints;
         else smoothed = lerpPolygon(smoothed, targetPoints, 0.35);
-        
+
         if (currentFaceTransform) lastFaceTransform = currentFaceTransform;
         if (currentSilhouette) lastSilhouette = currentSilhouette;
 
-        const polyData = currentFaceTransform || lastFaceTransform || smoothed;
-        if (polyData.corners) polyData.corners = smoothed;
+        const polyData = currentFaceTransform || lastFaceTransform;
+        polyData.corners = smoothed;
         compositeFrame(polyData, currentSilhouette || lastSilhouette, t);
-        setStatus(faceLostTime > 0 ? 'Recovering...' : '');
+        setStatus('Face tracked');
       } else {
         smoothed = null;
         currentFaceTransform = null;
         lastFaceTransform = null;
         lastSilhouette = null;
+        drawCanvasHint('Show your face to the camera');
+        setStatus('Camera on — show your face');
       }
     }
 
-    // --- MediaPipe setup was moved above ---
+    if (faceMesh) faceMesh.onResults(onResults);
+
+    // --- startup hints ---
+    if (!isSecureContext()) {
+      setStatus('Open via http://localhost:8080/ui.html (not file://)');
+      drawCanvasHint('Use a local server, then click Start Camera');
+    } else if (faceMesh) {
+      setStatus('Click Start Camera');
+      drawCanvasHint('Click Start Camera below');
+    } else {
+      drawCanvasHint('Tracking failed to load — check internet');
+    }
   </script>
 </body>
 </html>
