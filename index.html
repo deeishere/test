@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Frame in Frame</title>
+  <title>Frame in Frame — 3D Model</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
@@ -33,9 +33,7 @@
       gap: 1.5rem;
     }
 
-    header {
-      text-align: center;
-    }
+    header { text-align: center; }
 
     h1 {
       font-family: 'Syne', sans-serif;
@@ -68,22 +66,11 @@
       border: 1px solid rgba(255, 255, 255, 0.6);
     }
 
-    #output {
-      display: block;
-      width: 100%;
-      height: auto;
-      vertical-align: middle;
-    }
+    #output { display: block; width: 100%; height: auto; vertical-align: middle; }
 
-    video, #innerVideo { display: none; }
+    video { display: none; }
 
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
+    .controls { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; justify-content: center; }
 
     button {
       font-family: 'Outfit', sans-serif;
@@ -99,14 +86,9 @@
       transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
       box-shadow: 0 4px 14px rgba(15, 26, 12, 0.2);
     }
-
-    button:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(15, 26, 12, 0.28);
-      background: #1a2e14;
-    }
-
+    button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(15, 26, 12, 0.28); background: #1a2e14; }
     button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
 
     button.delete {
       background: transparent;
@@ -114,11 +96,7 @@
       border: 1.5px solid rgba(90, 48, 48, 0.35);
       box-shadow: none;
     }
-
-    button.delete:hover {
-      background: rgba(255, 255, 255, 0.5);
-      box-shadow: none;
-    }
+    button.delete:hover { background: rgba(255, 255, 255, 0.5); box-shadow: none; }
 
     .status {
       font-size: 0.9rem;
@@ -131,12 +109,51 @@
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.55);
     }
+
+    .tuning {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.55);
+      border-radius: 14px;
+      padding: 0.6rem 1rem;
+    }
+    .tuning summary {
+      cursor: pointer;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      padding: 0.3rem 0;
+    }
+    .tuning-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.7rem 1.2rem;
+      margin-top: 0.6rem;
+    }
+    .tuning-grid label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      font-size: 0.8rem;
+      color: #3d6b2e;
+    }
+    .tuning-grid input[type="range"] {
+      width: 100%;
+    }
+    .tuning-grid span {
+      font-size: 0.75rem;
+      color: #142410;
+      font-weight: 500;
+    }
+    .tuning-grid button {
+      align-self: end;
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+    }
   </style>
 </head>
 <body>
   <div class="app">
     <header>
-      <h1><span>Welcome to</span>Frame in Frame!</h1>
+      <h1><span>Welcome to</span>Frame in Frame — 3D Model</h1>
     </header>
 
     <div class="stage">
@@ -144,272 +161,129 @@
     </div>
 
     <div class="controls">
-      <button type="button" id="btnStart" style="background: #3d6b2e; color: white;">Start Camera</button>
-      <button type="button" id="btnUpload">Upload</button>
-      <button type="button" id="btnDelete" class="delete">Delete</button>
-      <input type="file" id="fileInput" accept="image/*,video/*" hidden />
+      <button type="button" id="btnStart" style="background: #3d6b2e; color: white;" disabled>Loading…</button>
+      <button type="button" id="btnUpload">Upload Model</button>
+      <button type="button" id="btnDelete" class="delete">Reset</button>
+      <input type="file" id="fileInput" accept=".glb,.gltf" hidden />
     </div>
 
-    <p class="status" id="status">Loading…</p>
+    <details class="tuning">
+      <summary>Adjust model fit</summary>
+      <div class="tuning-grid">
+        <label>Scale
+          <input type="range" id="sldScale" min="0.1" max="2" step="0.01" value="1" />
+          <span id="valScale">1.00×</span>
+        </label>
+        <label>X offset
+          <input type="range" id="sldPosX" min="-100" max="100" step="1" value="0" />
+          <span id="valPosX">0</span>
+        </label>
+        <label>Y offset
+          <input type="range" id="sldPosY" min="-100" max="100" step="1" value="0" />
+          <span id="valPosY">0</span>
+        </label>
+        <label>Z offset
+          <input type="range" id="sldPosZ" min="-100" max="100" step="1" value="0" />
+          <span id="valPosZ">0</span>
+        </label>
+        <label>Rotate X
+          <input type="range" id="sldRotX" min="-180" max="180" step="1" value="0" />
+          <span id="valRotX">0°</span>
+        </label>
+        <label>Rotate Y
+          <input type="range" id="sldRotY" min="-180" max="180" step="1" value="0" />
+          <span id="valRotY">0°</span>
+        </label>
+        <label>Rotate Z
+          <input type="range" id="sldRotZ" min="-180" max="180" step="1" value="0" />
+          <span id="valRotZ">0°</span>
+        </label>
+        <button type="button" id="btnResetTuning" class="delete">Reset sliders</button>
+      </div>
+    </details>
+
+    <p class="status" id="status">Loading face tracker…</p>
   </div>
 
   <video id="webcam" autoplay muted playsinline></video>
-  <video id="innerVideo" playsinline loop muted></video>
-  <img id="innerImage" src="spider.png" alt="" hidden />
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 
-  <script>
-    // Console logging to help debug
-    console.log("Script starting...");
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
+    // ---------- constants ----------
     const canvas = document.getElementById('output');
     const ctx = canvas.getContext('2d');
     const webcam = document.getElementById('webcam');
-    const innerVideo = document.getElementById('innerVideo');
-    const innerImage = document.getElementById('innerImage');
     const fileInput = document.getElementById('fileInput');
     const statusEl = document.getElementById('status');
+    const btnStart = document.getElementById('btnStart');
 
     const W = canvas.width;
     const H = canvas.height;
 
-    const DEFAULT_INNER = 'spider.jpg';
+    // Put your own model next to this file with this name, or use the
+    // Upload Model button. .glb is strongly recommended (single file,
+    // no separate texture/bin references to go missing).
+    const DEFAULT_MODEL_URL = 'model.glb';
 
-    let innerKind = 'image'; // image | video
-    let userBlobUrl = null;
-    let smoothed = null;
-    let currentFaceTransform = null;
-    let lastFaceTransform = null;
-    let lastSilhouette = null;
+    // Approximate human head width, in the canonical face model's units,
+    // that the loaded model gets auto-scaled to fit. Most downloaded
+    // models are wildly different native sizes, so this does the heavy
+    // lifting automatically — MODEL_SCALE below is just a multiplier on
+    // top of that for fine adjustment.
+    const TARGET_HEAD_WIDTH = 180;
+
+    // Fine-tuning knobs — every model is authored at a different scale/
+    // orientation, so you'll likely need to nudge these by eye once you
+    // have a real asset loaded. These are live-editable via the "Adjust
+    // model fit" sliders in the UI. Rotation is in degrees.
+    let modelScale = 1.0;
+    let modelPositionOffset = { x: 0, y: 0, z: 0 };
+    let modelRotationOffsetDeg = { x: 0, y: 0, z: 0 };
+
+    // MediaPipe's face-geometry virtual camera convention: the facial
+    // transformation matrix is designed to be used with a perspective
+    // camera at the origin looking down -Z, using these defaults from
+    // MediaPipe's face_geometry environment config. If the mesh looks
+    // too big/small for your webcam's actual FOV, tune this value.
+    const VERTICAL_FOV_DEGREES = 63;
+    const NEAR = 1;
+    const FAR = 10000;
+
+    const FACE_LANDMARKER_MODEL_URL =
+      'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+    const TASKS_VISION_WASM_URL =
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+
+    // ---------- state ----------
+    let faceLandmarker = null;
+    let trackingActive = false;
+    let processingFrame = false;
+    let cameraStream = null;
+    let lastMatrixData = null;
     let faceLostTime = 0;
     const RECOVERY_TIMEOUT = 1000; // ms
     let t0 = performance.now();
 
-    const FACE_OUTLINE = [
-      10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
-      400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
-      54, 103, 67, 109
-    ];
+    function setStatus(msg) { statusEl.textContent = msg || ' '; }
 
-    const LM_LEFT_CHEEK = 234;
-    const LM_RIGHT_CHEEK = 454;
-    const LM_FOREHEAD = 10;
-    const LM_CHIN = 152;
-    const LM_LEFT_EYE_OUTER = 33;
-    const LM_RIGHT_EYE_OUTER = 263;
-
-    function getFaceFrameCorners(landmarks, w, h, margin = 1.45) {
-      function pt(idx) {
-        const lm = landmarks[idx];
-        return [lm.x * w, lm.y * h];
-      }
-
-      const leftCheek = pt(LM_LEFT_CHEEK);
-      const rightCheek = pt(LM_RIGHT_CHEEK);
-      const forehead = pt(LM_FOREHEAD);
-      const chin = pt(LM_CHIN);
-      const leftEye = pt(LM_LEFT_EYE_OUTER);
-      const rightEye = pt(LM_RIGHT_EYE_OUTER);
-
-      const center = [
-        (leftCheek[0] + rightCheek[0] + forehead[0] + chin[0]) / 4,
-        (leftCheek[1] + rightCheek[1] + forehead[1] + chin[1]) / 4,
-      ];
-
-      const faceWidth = Math.sqrt(Math.pow(rightCheek[0] - leftCheek[0], 2) + Math.pow(rightCheek[1] - leftCheek[1], 2)) * margin;
-      const faceHeight = Math.sqrt(Math.pow(chin[0] - forehead[0], 2) + Math.pow(chin[1] - forehead[1], 2)) * margin;
-
-      const dx = rightEye[0] - leftEye[0];
-      const dy = rightEye[1] - leftEye[1];
-      const angle = Math.atan2(dy, dx);
-
-      const hw = faceWidth / 2;
-      const hh = faceHeight / 2;
-
-      const local = [
-        [-hw, -hh], // TL
-        [hw, -hh],  // TR
-        [hw, hh],   // BR
-        [-hw, hh],  // BL
-      ];
-
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-
-      const corners = local.map(p => [
-        p[0] * cos - p[1] * sin + center[0],
-        p[0] * sin + p[1] * cos + center[1],
-      ]);
-
-      return { corners, center, angle, faceWidth, faceHeight };
-    }
-
-    function lerpPolygon(prev, target, t) {
-      return prev.map((p, i) => [
-        p[0] + (target[i][0] - p[0]) * t,
-        p[1] + (target[i][1] - p[1]) * t,
-      ]);
-    }
-
-    function polygonArea(pts) {
-      let area = 0;
-      for (let i = 0; i < pts.length; i++) {
-        const j = (i + 1) % pts.length;
-        area += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
-      }
-      return Math.abs(area) / 2;
-    }
-
-    function coverCrop(source, tw, th) {
-      const off = document.createElement('canvas');
-      off.width = tw;
-      off.height = th;
-      const octx = off.getContext('2d');
-      const sw = source.videoWidth || source.naturalWidth || source.width;
-      const sh = source.videoHeight || source.naturalHeight || source.height;
-      if (!sw || !sh) return off;
-      const scale = Math.max(tw / sw, th / sh);
-      const nw = Math.ceil(sw * scale);
-      const nh = Math.ceil(sh * scale);
-      const x0 = (nw - tw) / 2;
-      const y0 = (nh - th) / 2;
-      octx.drawImage(source, -x0, -y0, nw, nh);
-      return off;
-    }
-
-    function placeholderTile(w, h, t) {
-      const off = document.createElement('canvas');
-      off.width = w;
-      off.height = h;
-      const octx = off.getContext('2d');
-      octx.fillStyle = '#101010';
-      octx.fillRect(0, 0, w, h);
-      const stripeW = 18;
-      const shift = (Math.floor(t * 40) % (stripeW * 2));
-      octx.fillStyle = '#52e0c4';
-      for (let x = -h - shift; x < w; x += stripeW * 2) {
-        octx.beginPath();
-        octx.moveTo(x, h);
-        octx.lineTo(x + h, 0);
-        octx.lineTo(x + h + stripeW, 0);
-        octx.lineTo(x + stripeW, h);
-        octx.closePath();
-        octx.fill();
-      }
-      octx.globalAlpha = 0.18;
-      octx.fillStyle = '#52e0c4';
-      octx.fillRect(0, 0, w, h);
-      return off;
-    }
-
-    function getInnerFrame(w, h, t) {
-      if (innerKind === 'video' && innerVideo.readyState >= 2) {
-        return coverCrop(innerVideo, w, h);
-      }
-      if (innerImage.complete && innerImage.naturalWidth) {
-        return coverCrop(innerImage, w, h);
-      }
-      return placeholderTile(w, h, t);
-    }
-
-    // --- inner content upload / delete ---
-
-    function revokeUserBlob() {
-      if (userBlobUrl) {
-        URL.revokeObjectURL(userBlobUrl);
-        userBlobUrl = null;
-      }
-    }
-
-    function loadDefaultInner() {
-      revokeUserBlob();
-      innerKind = 'image';
-      innerVideo.pause();
-      innerVideo.removeAttribute('src');
-      innerImage.src = DEFAULT_INNER;
-      fileInput.value = '';
-      setStatus('');
-    }
-
-    function uploadInnerFile(file) {
-      if (!file) return;
-      revokeUserBlob();
-      const url = URL.createObjectURL(file);
-      userBlobUrl = url;
-      if (file.type.startsWith('video/')) {
-        innerKind = 'video';
-        innerVideo.src = url;
-        innerVideo.play().catch(() => {});
-        setStatus(file.name);
-      } else if (file.type.startsWith('image/')) {
-        innerKind = 'image';
-        innerImage.onload = () => setStatus(file.name);
-        innerImage.src = url;
-      } else {
-        revokeUserBlob();
-        setStatus('Unsupported file');
-      }
-    }
-
-    function deleteInnerContent() {
-      loadDefaultInner();
-    }
-
-    function setStatus(msg) {
-      statusEl.textContent = msg || ' ';
-    }
-
-    function drawCanvasHint(text) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.fillRect(0, H - 52, W, 52);
-      ctx.fillStyle = '#D1FFBD';
-      ctx.font = '500 20px Outfit, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(text, W / 2, H - 20);
-      ctx.textAlign = 'left';
-    }
-
-    let faceMesh = null;
-
-    try {
-      if (typeof FaceMesh === 'undefined') {
-        throw new Error('MediaPipe FaceMesh script did not load');
-      }
-
-      faceMesh = new FaceMesh({
-        locateFile: (file) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`,
-      });
-
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: false,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.5,
-      });
-    } catch (error) {
-      console.error('MediaPipe init failed:', error);
-      setStatus(`Tracking unavailable: ${error.message}`);
-    }
-
-    let trackingActive = false;
-    let processingFrame = false;
-    let cameraStream = null;
-
-    // Mirrored offscreen buffer: we flip the webcam once into this canvas and
-    // use it both for display AND as the image MediaPipe tracks, so landmark
-    // coordinates already match the mirrored (selfie-view) picture — the same
-    // approach testracker.py uses (cv2.flip before face_mesh.process). This
-    // avoids mismatched/inconsistent flips between the video and the frame.
+    // ---------- mirrored webcam buffer (also fed to the landmarker so
+    // landmark coords line up with the mirrored/selfie-view picture) ----------
     const mirrorCanvas = document.createElement('canvas');
     mirrorCanvas.width = W;
     mirrorCanvas.height = H;
     const mirrorCtx = mirrorCanvas.getContext('2d');
-
-    function isSecureContext() {
-      return window.isSecureContext;
-    }
 
     function updateMirrorCanvas() {
       if (webcam.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
@@ -424,31 +298,276 @@
       ctx.drawImage(mirrorCanvas, 0, 0, W, H);
     }
 
+    function drawCanvasHint(text) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, H - 52, W, 52);
+      ctx.fillStyle = '#D1FFBD';
+      ctx.font = '500 20px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, W / 2, H - 20);
+      ctx.textAlign = 'left';
+    }
+
+    // ---------- three.js scene ----------
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(W, H);
+    renderer.setClearColor(0x000000, 0);
+    if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    const camera3d = new THREE.PerspectiveCamera(VERTICAL_FOV_DEGREES, W / H, NEAR, FAR);
+    // default three.js camera already looks down -Z with +Y up — matches
+    // the coordinate convention the transformation matrix expects.
+
+    // Basic lighting, since a real model's materials likely aren't unlit
+    // like the old flat texture-on-canonical-mesh was.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.4));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
+    keyLight.position.set(0.5, 1, 1);
+    scene.add(keyLight);
+
+    // Anchor object driven every frame by the Face Landmarker's head-pose
+    // matrix. Whatever model is currently mounted sits inside a wrapper
+    // Group that we auto-fit + let you fine-tune, as a child of this.
+    const anchor = new THREE.Object3D();
+    anchor.matrixAutoUpdate = false;
+    scene.add(anchor);
+
+    let currentWrapper = null;
+    let baseAutoScale = 1;
+    let userBlobUrl = null;
+
+    function disposeObject(obj) {
+      obj.traverse((node) => {
+        if (node.isMesh) {
+          node.geometry?.dispose();
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          mats.forEach((m) => {
+            if (!m) return;
+            Object.values(m).forEach((v) => { if (v && v.isTexture) v.dispose(); });
+            m.dispose();
+          });
+        }
+      });
+    }
+
+    // Applies the current scale/position/rotation knobs to whatever is
+    // mounted right now. Called on mount, and live from the sliders.
+    function applyWrapperTransform() {
+      if (!currentWrapper) return;
+      currentWrapper.scale.setScalar(baseAutoScale * modelScale);
+      currentWrapper.rotation.set(
+        THREE.MathUtils.degToRad(modelRotationOffsetDeg.x),
+        THREE.MathUtils.degToRad(modelRotationOffsetDeg.y),
+        THREE.MathUtils.degToRad(modelRotationOffsetDeg.z)
+      );
+      currentWrapper.position.set(modelPositionOffset.x, modelPositionOffset.y, modelPositionOffset.z);
+    }
+
+    // Wraps whatever object is passed in, auto-fits it to roughly head-
+    // sized, applies the manual calibration knobs, and swaps it in as the
+    // thing riding on the face anchor.
+    function mountObject(object3d) {
+      if (currentWrapper) {
+        anchor.remove(currentWrapper);
+        disposeObject(currentWrapper);
+      }
+
+      const box = new THREE.Box3().setFromObject(object3d);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      baseAutoScale = TARGET_HEAD_WIDTH / maxDim;
+
+      object3d.position.sub(center); // recenter the model at its own origin
+
+      const wrapper = new THREE.Group();
+      wrapper.add(object3d);
+      anchor.add(wrapper);
+      currentWrapper = wrapper;
+      applyWrapperTransform();
+      checkReady();
+    }
+
+    // Generic placeholder — plain geometric shapes only, so it's obviously
+    // a stand-in rather than any particular character, until you mount a
+    // real model.
+    function buildPlaceholder() {
+      const group = new THREE.Group();
+      const shellMat = new THREE.MeshStandardMaterial({ color: 0x1a2e14, roughness: 0.5 });
+      const accentMat = new THREE.MeshStandardMaterial({ color: 0x52e0c4, roughness: 0.3, emissive: 0x0c1a16 });
+
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.62), shellMat);
+      shell.scale.set(1, 1.15, 0.85);
+      group.add(shell);
+
+      const eyeGeo = new THREE.SphereGeometry(0.22, 20, 16);
+      const eyeL = new THREE.Mesh(eyeGeo, accentMat);
+      eyeL.position.set(-0.35, 0.05, 0.72);
+      const eyeR = eyeL.clone();
+      eyeR.position.x = 0.35;
+      group.add(eyeL, eyeR);
+
+      return group;
+    }
+
+    function loadDefaultModel() {
+      revokeUserBlob();
+      fileInput.value = '';
+      setStatus('Looking for ' + DEFAULT_MODEL_URL + '…');
+      new GLTFLoader().load(
+        DEFAULT_MODEL_URL,
+        (gltf) => {
+          mountObject(gltf.scene);
+          setStatus(DEFAULT_MODEL_URL);
+        },
+        undefined,
+        () => {
+          // No model.glb present — fall back to the placeholder so the
+          // rig is still visibly working.
+          mountObject(buildPlaceholder());
+          setStatus('No model.glb found — showing placeholder. Use Upload Model.');
+        }
+      );
+    }
+
+    function uploadModelFile(file) {
+      if (!file) return;
+      revokeUserBlob();
+      const url = URL.createObjectURL(file);
+      userBlobUrl = url;
+      setStatus('Loading ' + file.name + '…');
+      new GLTFLoader().load(
+        url,
+        (gltf) => {
+          mountObject(gltf.scene);
+          setStatus(file.name);
+        },
+        undefined,
+        (err) => {
+          console.error('Model load failed:', err);
+          setStatus('Failed to load that file — is it a valid .glb/.gltf?');
+        }
+      );
+    }
+
+    function revokeUserBlob() {
+      if (userBlobUrl) { URL.revokeObjectURL(userBlobUrl); userBlobUrl = null; }
+    }
+
+    // ---------- live tuning sliders ----------
+    const sliderConfig = [
+      { id: 'sldScale', valId: 'valScale', get: () => modelScale, set: (v) => { modelScale = v; }, fmt: (v) => v.toFixed(2) + '×' },
+      { id: 'sldPosX', valId: 'valPosX', get: () => modelPositionOffset.x, set: (v) => { modelPositionOffset.x = v; }, fmt: (v) => Math.round(v) },
+      { id: 'sldPosY', valId: 'valPosY', get: () => modelPositionOffset.y, set: (v) => { modelPositionOffset.y = v; }, fmt: (v) => Math.round(v) },
+      { id: 'sldPosZ', valId: 'valPosZ', get: () => modelPositionOffset.z, set: (v) => { modelPositionOffset.z = v; }, fmt: (v) => Math.round(v) },
+      { id: 'sldRotX', valId: 'valRotX', get: () => modelRotationOffsetDeg.x, set: (v) => { modelRotationOffsetDeg.x = v; }, fmt: (v) => Math.round(v) + '°' },
+      { id: 'sldRotY', valId: 'valRotY', get: () => modelRotationOffsetDeg.y, set: (v) => { modelRotationOffsetDeg.y = v; }, fmt: (v) => Math.round(v) + '°' },
+      { id: 'sldRotZ', valId: 'valRotZ', get: () => modelRotationOffsetDeg.z, set: (v) => { modelRotationOffsetDeg.z = v; }, fmt: (v) => Math.round(v) + '°' },
+    ];
+
+    function wireSliders() {
+      sliderConfig.forEach((cfg) => {
+        const input = document.getElementById(cfg.id);
+        const valSpan = document.getElementById(cfg.valId);
+        input.value = cfg.get();
+        valSpan.textContent = cfg.fmt(cfg.get());
+        input.addEventListener('input', () => {
+          const v = parseFloat(input.value);
+          cfg.set(v);
+          valSpan.textContent = cfg.fmt(v);
+          applyWrapperTransform();
+        });
+      });
+
+      document.getElementById('btnResetTuning').addEventListener('click', () => {
+        modelScale = 1.0;
+        modelPositionOffset = { x: 0, y: 0, z: 0 };
+        modelRotationOffsetDeg = { x: 0, y: 0, z: 0 };
+        sliderConfig.forEach((cfg) => {
+          const input = document.getElementById(cfg.id);
+          const valSpan = document.getElementById(cfg.valId);
+          input.value = cfg.get();
+          valSpan.textContent = cfg.fmt(cfg.get());
+        });
+        applyWrapperTransform();
+      });
+    }
+    wireSliders();
+
+    // ---------- face landmarker readiness ----------
+    let landmarkerReady = false;
+
+    function checkReady() {
+      if (landmarkerReady) {
+        btnStart.disabled = false;
+        btnStart.textContent = 'Start Camera';
+        setStatus('Click Start Camera');
+        drawCanvasHint('Click Start Camera below');
+      }
+    }
+
+    document.getElementById('btnUpload').addEventListener('click', () => fileInput.click());
+    document.getElementById('btnDelete').addEventListener('click', loadDefaultModel);
+    fileInput.addEventListener('change', (e) => uploadModelFile(e.target.files[0]));
+
+    // Mount the placeholder immediately so the rig is testable right away,
+    // then try to replace it with model.glb if one exists.
+    mountObject(buildPlaceholder());
+    loadDefaultModel();
+
+    async function initFaceLandmarker() {
+      try {
+        const filesetResolver = await FilesetResolver.forVisionTasks(TASKS_VISION_WASM_URL);
+        try {
+          faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+            baseOptions: { modelAssetPath: FACE_LANDMARKER_MODEL_URL, delegate: 'GPU' },
+            outputFaceBlendshapes: false,
+            outputFacialTransformationMatrixes: true,
+            runningMode: 'VIDEO',
+            numFaces: 1,
+          });
+        } catch (gpuErr) {
+          console.warn('GPU delegate failed, retrying on CPU:', gpuErr);
+          faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+            baseOptions: { modelAssetPath: FACE_LANDMARKER_MODEL_URL, delegate: 'CPU' },
+            outputFaceBlendshapes: false,
+            outputFacialTransformationMatrixes: true,
+            runningMode: 'VIDEO',
+            numFaces: 1,
+          });
+        }
+        landmarkerReady = true;
+        checkReady();
+      } catch (err) {
+        console.error('Face Landmarker init failed:', err);
+        setStatus(`Tracking unavailable: ${err.message || err}`);
+      }
+    }
+
+    initFaceLandmarker();
+
+    // ---------- camera ----------
+    function isSecureContext() { return window.isSecureContext; }
+
     async function startCamera() {
       if (!navigator.mediaDevices?.getUserMedia) {
         setStatus('Camera API unavailable — open via http://localhost, not file://');
         return;
       }
-
       if (!isSecureContext()) {
         setStatus('Camera needs HTTPS or localhost — run: python3 -m http.server');
         return;
       }
-
       try {
         setStatus('Starting camera…');
         btnStart.disabled = true;
-
-        if (cameraStream) {
-          cameraStream.getTracks().forEach(track => track.stop());
-        }
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
 
         cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: W },
-            height: { ideal: H },
-          },
+          video: { facingMode: 'user', width: { ideal: W }, height: { ideal: H } },
           audio: false,
         });
 
@@ -462,161 +581,67 @@
       } catch (err) {
         console.error('Camera start failed:', err);
         btnStart.disabled = false;
-        if (err.name === 'NotAllowedError') {
-          setStatus('Camera blocked — allow access in browser settings');
-        } else if (err.name === 'NotFoundError') {
-          setStatus('No camera found on this device');
-        } else {
-          setStatus(`Camera error: ${err.message || err.name}`);
-        }
+        if (err.name === 'NotAllowedError') setStatus('Camera blocked — allow access in browser settings');
+        else if (err.name === 'NotFoundError') setStatus('No camera found on this device');
+        else setStatus(`Camera error: ${err.message || err.name}`);
       }
     }
+    btnStart.addEventListener('click', startCamera);
 
+    // ---------- per-frame processing ----------
     async function processCameraFrame() {
       if (!trackingActive) return;
 
       const hasFrame = updateMirrorCanvas();
       drawWebcamFrame();
 
-      if (faceMesh && hasFrame && !processingFrame) {
+      if (faceLandmarker && hasFrame && !processingFrame && currentWrapper) {
         processingFrame = true;
         try {
-          // Send the already-mirrored canvas, not the raw webcam element, so
-          // landmark x/y line up directly with what's drawn on screen.
-          await faceMesh.send({ image: mirrorCanvas });
+          const results = faceLandmarker.detectForVideo(mirrorCanvas, performance.now());
+          const matrices = results.facialTransformationMatrixes;
+
+          if (matrices && matrices.length > 0) {
+            lastMatrixData = matrices[0].data;
+            faceLostTime = 0;
+            applyTransformAndRender();
+            setStatus('Face tracked');
+          } else if (lastMatrixData && faceLostTime === 0) {
+            faceLostTime = performance.now();
+            applyTransformAndRender();
+          } else if (lastMatrixData && performance.now() - faceLostTime < RECOVERY_TIMEOUT) {
+            applyTransformAndRender();
+          } else {
+            lastMatrixData = null;
+            drawCanvasHint('Show your face to the camera');
+            setStatus('Camera on — show your face');
+          }
         } catch (error) {
-          console.error('MediaPipe frame error:', error);
+          console.error('Face Landmarker frame error:', error);
           setStatus(`Tracking error: ${error.message || error}`);
         } finally {
           processingFrame = false;
         }
-      } else if (!faceMesh) {
-        drawCanvasHint('Camera on — tracking model not loaded');
+      } else if (!currentWrapper) {
+        drawCanvasHint('Loading model…');
       }
 
       requestAnimationFrame(processCameraFrame);
     }
 
-    // --- event listeners ---
-
-    const btnStart = document.getElementById('btnStart');
-
-    btnStart.addEventListener('click', startCamera);
-
-    document.getElementById('btnUpload').addEventListener('click', () => fileInput.click());
-    document.getElementById('btnDelete').addEventListener('click', deleteInnerContent);
-    fileInput.addEventListener('change', (e) => uploadInnerFile(e.target.files[0]));
-
-    // --- compositing ---
-
-    function drawPolygonMask(points) {
-      ctx.beginPath();
-      ctx.moveTo(points[0][0], points[0][1]);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
-      ctx.closePath();
+    function applyTransformAndRender() {
+      anchor.matrix.fromArray(lastMatrixData);
+      anchor.matrixWorldNeedsUpdate = true;
+      renderer.render(scene, camera3d);
+      ctx.drawImage(renderer.domElement, 0, 0, W, H);
     }
 
-    function drawSilhouetteMask(points) {
-      if (!points || points.length === 0) return;
-      ctx.beginPath();
-      ctx.moveTo(points[0][0], points[0][1]);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
-      ctx.closePath();
-    }
-
-    function compositeFrame(polyData, silhouette, t) {
-      const poly = polyData.corners;
-      const { center, angle, faceWidth, faceHeight } = polyData;
-
-      ctx.save();
-      // Apply silhouette mask
-      if (silhouette) {
-        drawSilhouetteMask(silhouette);
-      } else {
-        drawPolygonMask(poly);
-      }
-      ctx.clip();
-
-      // Rotate/scale the inner content to match the face's tilt and size
-      ctx.translate(center[0], center[1]);
-      ctx.rotate(angle);
-      const innerFrame = getInnerFrame(Math.ceil(faceWidth), Math.ceil(faceHeight), t);
-      ctx.drawImage(innerFrame, -faceWidth / 2, -faceHeight / 2, faceWidth, faceHeight);
-      ctx.restore();
-
-      // Viewfinder overlay: outline the face silhouette only
-      if (silhouette) {
-        ctx.strokeStyle = '#52e0c4';
-        ctx.lineWidth = 2;
-        drawSilhouetteMask(silhouette);
-        ctx.stroke();
-      }
-
-      const ratio = polygonArea(poly) / (W * H);
-      return ratio;
-    }
-
-    function onResults(results) {
-      const t = (performance.now() - t0) / 1000;
-
-      // Feed is drawn every frame in processCameraFrame; only composite overlay here.
-      if (!trackingActive) return;
-
-      drawWebcamFrame();
-
-      let targetPoints = null;
-      let currentSilhouette = null;
-      currentFaceTransform = null;
-
-      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        // mirrorCanvas was already flipped before being sent to MediaPipe, so
-        // these landmark x/y map directly onto the canvas — no extra mirroring.
-        const lms = results.multiFaceLandmarks[0];
-        currentFaceTransform = getFaceFrameCorners(lms, W, H);
-        targetPoints = currentFaceTransform.corners;
-        currentSilhouette = FACE_OUTLINE.map(idx => [lms[idx].x * W, lms[idx].y * H]);
-        faceLostTime = 0;
-      } else {
-        if (faceLostTime === 0) faceLostTime = performance.now();
-        if (performance.now() - faceLostTime < RECOVERY_TIMEOUT) {
-          targetPoints = smoothed;
-          currentFaceTransform = lastFaceTransform;
-          currentSilhouette = lastSilhouette;
-        }
-      }
-
-      if (targetPoints) {
-        if (!smoothed) smoothed = targetPoints;
-        else smoothed = lerpPolygon(smoothed, targetPoints, 0.35);
-
-        if (currentFaceTransform) lastFaceTransform = currentFaceTransform;
-        if (currentSilhouette) lastSilhouette = currentSilhouette;
-
-        const polyData = currentFaceTransform || lastFaceTransform;
-        polyData.corners = smoothed;
-        compositeFrame(polyData, currentSilhouette || lastSilhouette, t);
-        setStatus('Face tracked');
-      } else {
-        smoothed = null;
-        currentFaceTransform = null;
-        lastFaceTransform = null;
-        lastSilhouette = null;
-        drawCanvasHint('Show your face to the camera');
-        setStatus('Camera on — show your face');
-      }
-    }
-
-    if (faceMesh) faceMesh.onResults(onResults);
-
-    // --- startup hints ---
+    // ---------- startup hints ----------
     if (!isSecureContext()) {
-      setStatus('Open via http://localhost:8080/ui.html (not file://)');
+      setStatus('Open via http://localhost:8080/ (not file://)');
       drawCanvasHint('Use a local server, then click Start Camera');
-    } else if (faceMesh) {
-      setStatus('Click Start Camera');
-      drawCanvasHint('Click Start Camera below');
     } else {
-      drawCanvasHint('Tracking failed to load — check internet');
+      drawCanvasHint('Loading model…');
     }
   </script>
 </body>
