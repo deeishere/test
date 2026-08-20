@@ -235,7 +235,7 @@
     // Put your own model next to this file with this name, or use the
     // Upload Model button. .glb is strongly recommended (single file,
     // no separate texture/bin references to go missing).
-    const DEFAULT_MODEL_URL = 'model.glb';
+    const DEFAULT_MODEL_URL = 'spider.glb';
 
     // Approximate human head width, in the canonical face model's units,
     // that the loaded model gets auto-scaled to fit. Most downloaded
@@ -425,10 +425,10 @@
         },
         undefined,
         () => {
-          // No model.glb present — fall back to the placeholder so the
+          // No spider.glb present — fall back to the placeholder so the
           // rig is still visibly working.
           mountObject(buildPlaceholder());
-          setStatus('No model.glb found — showing placeholder. Use Upload Model.');
+          setStatus('No spider.glb found — showing placeholder. Use Upload Model.');
         }
       );
     }
@@ -514,7 +514,7 @@
     fileInput.addEventListener('change', (e) => uploadModelFile(e.target.files[0]));
 
     // Mount the placeholder immediately so the rig is testable right away,
-    // then try to replace it with model.glb if one exists.
+    // then try to replace it with spider.glb if one exists.
     mountObject(buildPlaceholder());
     loadDefaultModel();
 
